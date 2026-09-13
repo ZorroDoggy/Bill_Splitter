@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bill Splitter</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#171512">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bill Splitter">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+<style>
+  :root {
+    --bg: #171512;
+    --card: #211e1a;
+    --ink: #f1ece4;
+    --muted: #9a9187;
+    --accent: #e2823f;
+    --accent-strong: #f2954f;
+    --accent-soft: #3a2a1e;
+    --line: #38332c;
+    --good: #6fb98a;
+    --bad: #e2823f;
+    --pill: #2b2722;
+    --field-bg: #1c1a16;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    padding: calc(24px + env(safe-area-inset-top)) 16px calc(60px + env(safe-area-inset-bottom));
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  h1 { font-size: 1.4rem; font-weight: 700; margin: 0 0 4px; color: var(--ink); }
+  .sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 16px; }
+  .storage-note { font-size: 0.76rem; color: var(--muted); margin-bottom: 16px; display: none; }
+
+  /* Bill tabs */
+  .bills-bar {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 20px;
+  }
+  .bill-tab {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--pill); color: var(--muted);
+    border: 1px solid var(--line); border-radius: 999px;
+    padding: 6px 6px 6px 14px; font-size: 0.85rem; font-weight: 600;
+    cursor: pointer;
+  }
+  .bill-tab.active { background: var(--accent-soft); color: var(--accent-strong); border-color: var(--accent); }
+  .bill-tab .tab-close {
+    background: none; border: none; color: inherit; opacity: 0.55; cursor: pointer;
+    font-size: 1rem; padding: 0 4px; line-height: 1;
+  }
+  .bill-tab .tab-close:hover { opacity: 1; }
+  .add-bill-btn {
+    background: transparent; color: var(--accent-strong); border: 1px dashed var(--accent);
+    border-radius: 999px; padding: 6px 14px; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+  }
+  .bill-name-row { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+  .bill-name-row label { font-size: 0.8rem; color: var(--muted); }
+  .bill-name-row input[type="text"] {
+    font-size: 1rem; font-weight: 700; color: var(--ink); background: var(--field-bg);
+    border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; max-width: 320px;
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 18px;
+    margin-bottom: 16px;
+    overflow-x: auto;
+  }
+  .card h2 {
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    margin: 0 0 12px;
+  }
+  /* Mode toggle */
+  .mode-toggle {
+    display: inline-flex;
+    background: var(--pill);
+    border-radius: 999px;
+    padding: 3px;
+    gap: 3px;
+  }
+  .mode-toggle button {
+    border: none;
+    background: transparent;
+    padding: 7px 16px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .mode-toggle button.active {
+    background: var(--accent);
+    color: #1a1512;
+  }
+  .mode-desc { font-size: 0.8rem; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+
+  /* Guest cards */
+  .guest-card {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 14px;
+    background: #1c1a16;
+  }
+  .guest-head {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+    background: var(--accent);
+    border-radius: 8px;
+    padding: 6px 10px;
+  }
+  .guest-head input[type="text"] {
+    font-size: 1.05rem; font-weight: 700; border: none; background: transparent;
+    padding: 4px 2px; flex: 1; border-bottom: 1px solid transparent;
+    color: #211a12;
+  }
+  .guest-head input[type="text"]::placeholder { color: #211a12; opacity: 0.55; }
+  .guest-head input[type="text"]:focus { outline: none; border-bottom: 1px solid #211a12; }
+  .remove-guest-btn {
+    background: none; border: none; color: #211a12; cursor: pointer;
+    font-size: 1.2rem; padding: 0 4px; opacity: 0.75;
+  }
+  .remove-guest-btn:hover { opacity: 1; }
+  .items-table { width: 100%; border-collapse: collapse; min-width: 720px; }
+  .items-table th {
+    text-align: left; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em;
+    color: var(--muted); font-weight: 600; padding: 4px 6px; border-bottom: 1px solid var(--line);
+  }
+  .items-table td { padding: 5px 6px; vertical-align: middle; }
+  select, input[type="number"], input[type="text"].name-field {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 0.86rem;
+    background: var(--field-bg);
+    color: var(--ink);
+    width: 100%;
+  }
+  select:focus, input:focus { outline: 1px solid var(--accent); }
+  input[type="number"] { text-align: right; }
+  .post-tax-cell { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink); font-weight: 600; white-space: nowrap; }
+  .chk-cell { text-align: center; }
+  .chk-cell input { transform: scale(1.1); cursor: pointer; accent-color: var(--accent); }
+  .chk-cell.disabled { opacity: 0.3; }
+  .item-remove-btn {
+    background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1rem;
+  }
+  .add-item-btn {
+    margin-top: 8px;
+    background: var(--pill); color: var(--ink);
+    border: none; border-radius: 7px; padding: 6px 12px;
+    font-size: 0.82rem; font-weight: 600; cursor: pointer;
+  }
+  .add-guest-btn {
+    background: var(--accent-soft); color: var(--accent-strong);
+    border: none; border-radius: 8px; padding: 9px 16px;
+    font-size: 0.9rem; font-weight: 600; cursor: pointer;
+    margin-top: 4px;
+  }
+  .empty-note { color: var(--muted); font-size: 0.88rem; padding: 10px 0; }
+
+  /* Tip section */
+  .tip-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .tip-row select { width: auto; min-width: 190px; }
+  .tip-row input[type="number"] { width: 130px; }
+  .tip-note { font-size: 0.8rem; color: var(--muted); width: 100%; margin-top: 6px; }
+
+  /* Results */
+  table.results { width: 100%; border-collapse: collapse; min-width: 640px; }
+  table.results th, table.results td { padding: 7px 6px; text-align: right; font-size: 0.88rem; }
+  table.results th { color: var(--muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 1px solid var(--line); }
+  table.results td:first-child, table.results th:first-child { text-align: left; color: var(--accent-strong); font-weight: 600; }
+  table.results tbody tr { border-bottom: 1px solid var(--line); }
+  .amt-pos { color: var(--bad); font-weight: 600; }
+  .amt-neg { color: var(--good); font-weight: 600; }
+  .grand {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-top: 14px; padding-top: 14px; border-top: 2px solid var(--line);
+    font-weight: 700; font-size: 1.0rem; flex-wrap: wrap; gap: 6px; color: var(--ink);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Bill Splitter</h1>
+  <div class="sub">Keep multiple bills side by side, log each guest's items, and set the split and tip rules per bill.</div>
+  <div class="storage-note" id="storageNote">Your browser isn't allowing local saving right now, so bills will reset if you reload &mdash; this is normal when previewing inside chat.</div>
+
+  <div class="bills-bar" id="billsBar"></div>
+  <div class="bill-name-row">
+    <label for="billNameInput">Bill name</label>
+    <input type="text" id="billNameInput" placeholder="Untitled Bill" oninput="renameCurrentBill(this.value)">
+  </div>
+
+  <div class="card">
+    <h2>Split Mode</h2>
+    <div class="mode-toggle">
+      <button id="modeEvenBtn" onclick="setMode('even')">Even Split</button>
+      <button id="modeItemBtn" onclick="setMode('itemized')">Itemized</button>
+    </div>
+    <div class="mode-desc" id="modeDesc"></div>
+  </div>
+
+  <div class="card">
+    <h2>Guests</h2>
+    <div id="guestsArea"></div>
+    <button class="add-guest-btn" onclick="addGuest()">+ Add guest</button>
+  </div>
+
+  <div class="card">
+    <h2>Tip / Service Fee</h2>
+    <div class="tip-row">
+      <select id="tipType" onchange="updateTipType(this.value)">
+        <option value="flat">Flat amount, split evenly</option>
+        <option value="percent">Percentage of subtotal</option>
+        <option value="perguest">Fixed amount per guest</option>
+      </select>
+      <input type="number" id="tipValue" min="0" step="0.01" oninput="updateTipValue(this.value)">
+      <span id="tipUnitLabel"></span>
+      <div class="tip-note" id="tipNote"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Split Result</h2>
+    <div id="resultsArea"></div>
+  </div>
+
+  <div class="card">
+    <h2>Transfer Between Devices</h2>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+      <button class="add-guest-btn" onclick="exportBills()">Export all bills (.json)</button>
+      <label class="add-guest-btn" style="cursor:pointer; margin:0;">
+        Import bills (.json)
+        <input type="file" accept="application/json" style="display:none;" onchange="importBillsFile(this.files[0]); this.value='';">
+      </label>
+    </div>
+    <div class="tip-note" style="margin-top:8px;">Bills are saved on this device only. Export a file here, move it to your other device (AirDrop, email, cloud drive), then import it there &mdash; imported bills are added alongside what's already on that device.</div>
+  </div>
+</div>
+
+<script>
+const CATEGORIES = [
+  { value: 'cash', label: 'Cash / Card Paid', type: 'payment' },
+  { value: 'giftcard', label: 'Gift Card Paid', type: 'payment' },
+  { value: 'cocktail', label: 'Cocktail', type: 'expense' },
+  { value: 'wine', label: 'Wine', type: 'expense' },
+  { value: 'food', label: 'Food', type: 'expense' },
+  { value: 'accommodation', label: 'Accommodation', type: 'expense' },
+  { value: 'travel', label: 'Travel', type: 'expense' },
+  { value: 'misc', label: 'Miscellaneous', type: 'expense' },
+];
+function catInfo(v) { return CATEGORIES.find(c => c.value === v) || CATEGORIES[2]; }
+
+const STORAGE_KEY = 'billSplitterData_v1';
+let storageAvailable = true;
+
+let bills = {};          // billId -> { id, name, guests, splitMode, tipType, tipValue }
+let currentBillId = null;
+let billIdCounter = 0;
+let guestIdCounter = 0;
+let itemIdCounter = 0;
+
+function newItem(category = 'food', amount = '', taxPct = '', notSplit = false) {
+  return { id: itemIdCounter++, category, amount, taxPct, notSplit };
+}
+function newGuest(name = '', items = []) {
+  return { id: guestIdCounter++, name, items };
+}
+function newBill(name) {
+  const id = billIdCounter++;
+  return { id, name: name || `Bill ${id + 1}`, guests: [], splitMode: 'even', tipType: 'flat', tipValue: '' };
+}
+function getCurrentBill() {
+  return bills[currentBillId];
+}
+
+/* ---------- Export / Import ---------- */
+function exportBills() {
+  const payload = { bills, exportedAt: new Date().toISOString(), version: 1 };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `bill-splitter-export-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function importBillsFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const payload = JSON.parse(e.target.result);
+      if (!payload || !payload.bills || typeof payload.bills !== 'object') {
+        throw new Error('This file does not look like a Bill Splitter export.');
+      }
+      const importedBillIds = [];
+      Object.values(payload.bills).forEach((b) => {
+        const newBillId = billIdCounter++;
+        const newGuests = (b.guests || []).map((g) => {
+          const newGuestId = guestIdCounter++;
+          const newItems = (g.items || []).map((it) => ({ ...it, id: itemIdCounter++ }));
+          return { ...g, id: newGuestId, items: newItems };
+        });
+        bills[newBillId] = {
+          ...b,
+          id: newBillId,
+          guests: newGuests,
+          name: (b.name || 'Untitled Bill') + ' (imported)',
+        };
+        importedBillIds.push(newBillId);
+      });
+      if (importedBillIds.length > 0) currentBillId = importedBillIds[0];
+      render();
+      alert(`Imported ${importedBillIds.length} bill${importedBillIds.length === 1 ? '' : 's'}.`);
+    } catch (err) {
+      alert('Could not import that file: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+/* ---------- Persistence ---------- */
+function saveState() {
+  if (!storageAvailable) return;
+  try {
+    const payload = { bills, currentBillId, guestIdCounter, itemIdCounter, billIdCounter };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  } catch (e) {
+    storageAvailable = false;
+    document.getElementById('storageNote').style.display = 'block';
+  }
+}
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    const payload = JSON.parse(raw);
+    if (!payload || !payload.bills || Object.keys(payload.bills).length === 0) return false;
+    bills = payload.bills;
+    currentBillId = payload.currentBillId;
+    guestIdCounter = payload.guestIdCounter || 0;
+    itemIdCounter = payload.itemIdCounter || 0;
+    billIdCounter = payload.billIdCounter || 0;
+    if (!bills[currentBillId]) currentBillId = Object.keys(bills)[0];
+    return true;
+  } catch (e) {
+    storageAvailable = false;
+    return false;
+  }
+}
+
+/* ---------- Bill management ---------- */
+function addBill() {
+  const b = newBill();
+  bills[b.id] = b;
+  currentBillId = b.id;
+  render();
+}
+function switchBill(id) {
+  currentBillId = id;
+  render();
+}
+function deleteBill(id) {
+  const ids = Object.keys(bills).map(Number);
+  if (ids.length <= 1) return; // always keep at least one bill
+  delete bills[id];
+  if (currentBillId === id) {
+    currentBillId = Object.keys(bills).map(Number)[0];
+  }
+  render();
+}
+function renameCurrentBill(value) {
+  const b = getCurrentBill();
+  if (b) b.name = value;
+  renderBillsBar(); // reflect new name in tabs without full re-render (keeps input focus)
+  saveState();
+}
+
+/* ---------- Guest / item management (operate on current bill) ---------- */
+function addGuest() {
+  getCurrentBill().guests.push(newGuest('', [newItem()]));
+  render();
+}
+function removeGuest(id) {
+  const b = getCurrentBill();
+  b.guests = b.guests.filter(g => g.id !== id);
+  render();
+}
+function updateGuestName(id, value) {
+  const g = getCurrentBill().guests.find(g => g.id === id);
+  if (g) g.name = value;
+  render();
+}
+function addItem(guestId) {
+  const g = getCurrentBill().guests.find(g => g.id === guestId);
+  if (g) g.items.push(newItem());
+  render();
+}
+function removeItem(guestId, itemId) {
+  const g = getCurrentBill().guests.find(g => g.id === guestId);
+  if (g) g.items = g.items.filter(it => it.id !== itemId);
+  render();
+}
+function updateItem(guestId, itemId, field, value) {
+  const g = getCurrentBill().guests.find(g => g.id === guestId);
+  if (!g) return;
+  const it = g.items.find(it => it.id === itemId);
+  if (!it) return;
+  if (field === 'notSplit') it.notSplit = value;
+  else it[field] = value;
+  render();
+}
+
+function setMode(mode) {
+  getCurrentBill().splitMode = mode;
+  render();
+}
+function updateTipType(value) {
+  getCurrentBill().tipType = value;
+  render();
+}
+function updateTipValue(value) {
+  getCurrentBill().tipValue = value;
+  render();
+}
+
+function num(v) {
+  const n = parseFloat(v);
+  return isNaN(n) ? 0 : n;
+}
+
+// Post-tax amount for an item: if no tax % entered, post-tax = amount
+function postTaxAmount(it) {
+  const base = num(it.amount);
+  const pct = it.taxPct === '' || it.taxPct === null || it.taxPct === undefined ? 0 : num(it.taxPct);
+  return base * (1 + pct / 100);
+}
+
+function escapeHtml(s) {
+  return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function escapeAttr(s) { return (s || '').replace(/"/g, '&quot;'); }
+
+/* ---------- Rendering ---------- */
+function renderBillsBar() {
+  const bar = document.getElementById('billsBar');
+  const ids = Object.keys(bills).map(Number).sort((a, b) => a - b);
+  bar.innerHTML = ids.map(id => {
+    const b = bills[id];
+    const active = id === currentBillId;
+    const canDelete = ids.length > 1;
+    return `
+      <span class="bill-tab ${active ? 'active' : ''}" onclick="switchBill(${id})">
+        ${escapeHtml(b.name) || 'Untitled Bill'}
+        ${canDelete ? `<button class="tab-close" onclick="event.stopPropagation(); deleteBill(${id})" title="Delete bill">&times;</button>` : ''}
+      </span>
+    `;
+  }).join('') + `<button class="add-bill-btn" onclick="addBill()">+ New bill</button>`;
+
+  const nameInput = document.getElementById('billNameInput');
+  const current = getCurrentBill();
+  if (document.activeElement !== nameInput) {
+    nameInput.value = current ? current.name : '';
+  }
+}
+
+function renderModeUI() {
+  const b = getCurrentBill();
+  document.getElementById('modeEvenBtn').classList.toggle('active', b.splitMode === 'even');
+  document.getElementById('modeItemBtn').classList.toggle('active', b.splitMode === 'itemized');
+  const desc = document.getElementById('modeDesc');
+  if (b.splitMode === 'even') {
+    desc.innerHTML = 'Expense items are pooled and divided evenly across every guest. Check "Not split" on an item to bill it only to the guest who logged it (e.g. a personal travel cost) instead of pooling it.';
+  } else {
+    desc.innerHTML = 'Each guest is billed for exactly what they logged &mdash; nothing is pooled. The "Not split" checkbox has no effect in this mode.';
+  }
+}
+
+function renderGuests() {
+  const b = getCurrentBill();
+  const area = document.getElementById('guestsArea');
+  if (b.guests.length === 0) {
+    area.innerHTML = '<div class="empty-note">No guests yet &mdash; add one below.</div>';
+    return;
+  }
+  area.innerHTML = b.guests.map(g => `
+    <div class="guest-card">
+      <div class="guest-head">
+        <input type="text" class="name-field" value="${escapeAttr(g.name)}" placeholder="Guest name"
+          oninput="updateGuestName(${g.id}, this.value)">
+        <button class="remove-guest-btn" onclick="removeGuest(${g.id})" title="Remove guest">&times;</button>
+      </div>
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th style="width:28%;">Category</th>
+            <th style="width:16%;">Amount</th>
+            <th style="width:14%;">Tax %</th>
+            <th style="width:16%;">Post-Tax</th>
+            <th style="width:16%;">Not split</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${g.items.map(it => {
+            const info = catInfo(it.category);
+            const disabled = info.type === 'payment';
+            const postTax = postTaxAmount(it);
+            return `
+              <tr>
+                <td>
+                  <select onchange="updateItem(${g.id}, ${it.id}, 'category', this.value)">
+                    ${CATEGORIES.map(c => `<option value="${c.value}" ${c.value === it.category ? 'selected' : ''}>${c.label}</option>`).join('')}
+                  </select>
+                </td>
+                <td><input type="number" min="0" step="0.01" value="${it.amount}" placeholder="0.00"
+                  oninput="updateItem(${g.id}, ${it.id}, 'amount', this.value)"></td>
+                <td><input type="number" min="0" step="0.01" value="${it.taxPct}" placeholder="0"
+                  oninput="updateItem(${g.id}, ${it.id}, 'taxPct', this.value)"></td>
+                <td class="post-tax-cell">$${postTax.toFixed(2)}</td>
+                <td class="chk-cell ${disabled ? 'disabled' : ''}">
+                  <input type="checkbox" ${it.notSplit ? 'checked' : ''} ${disabled ? 'disabled' : ''}
+                    onchange="updateItem(${g.id}, ${it.id}, 'notSplit', this.checked)">
+                </td>
+                <td><button class="item-remove-btn" onclick="removeItem(${g.id}, ${it.id})">&times;</button></td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+      <button class="add-item-btn" onclick="addItem(${g.id})">+ Add item</button>
+    </div>
+  `).join('');
+}
+
+function computeResults() {
+  const b = getCurrentBill();
+  const guests = b.guests;
+  const n = guests.length;
+  let sharedPool = 0;
+  const perGuest = {};
+
+  guests.forEach(g => {
+    let paid = 0, notSplitTotal = 0, ownExpense = 0;
+    g.items.forEach(it => {
+      const info = catInfo(it.category);
+      const amt = postTaxAmount(it);
+      if (info.type === 'payment') {
+        paid += amt;
+      } else if (b.splitMode === 'itemized') {
+        ownExpense += amt;
+      } else {
+        if (it.notSplit) notSplitTotal += amt;
+        else sharedPool += amt;
+      }
+    });
+    perGuest[g.id] = { paid, notSplitTotal, ownExpense };
+  });
+
+  const evenShare = (b.splitMode === 'even' && n > 0) ? sharedPool / n : 0;
+
+  const tipType = b.tipType;
+  const tipValue = num(b.tipValue);
+  let tipTotal = 0;
+  if (tipType === 'flat') {
+    tipTotal = tipValue;
+  } else if (tipType === 'perguest') {
+    tipTotal = tipValue * n;
+  } else if (tipType === 'percent') {
+    let subtotal;
+    if (b.splitMode === 'even') {
+      subtotal = sharedPool + Object.values(perGuest).reduce((s, d) => s + d.notSplitTotal, 0);
+    } else {
+      subtotal = Object.values(perGuest).reduce((s, d) => s + d.ownExpense, 0);
+    }
+    tipTotal = subtotal * (tipValue / 100);
+  }
+  const tipShare = n > 0 ? tipTotal / n : 0;
+
+  const results = guests.map(g => {
+    const d = perGuest[g.id];
+    const consumption = b.splitMode === 'even' ? evenShare + d.notSplitTotal : d.ownExpense;
+    const owed = consumption + tipShare;
+    const balance = owed - d.paid;
+    return { ...g, ...d, consumption, tipShare, owed, balance };
+  });
+
+  return { results, tipTotal, tipShare, evenShare, sharedPool, splitMode: b.splitMode };
+}
+
+function renderTipControls() {
+  const b = getCurrentBill();
+  document.getElementById('tipType').value = b.tipType;
+  document.getElementById('tipValue').value = b.tipValue;
+}
+
+function renderTipNote(tipType, tipTotal, tipShare, n) {
+  const note = document.getElementById('tipNote');
+  const unitLabel = document.getElementById('tipUnitLabel');
+  unitLabel.textContent = tipType === 'percent' ? '%' : '$';
+  if (n === 0) { note.textContent = ''; return; }
+  note.textContent = `Total tip: $${tipTotal.toFixed(2)} · $${tipShare.toFixed(2)} per guest across ${n} guest${n === 1 ? '' : 's'}.`;
+}
+
+function renderResults() {
+  const b = getCurrentBill();
+  const area = document.getElementById('resultsArea');
+  if (b.guests.length === 0) {
+    area.innerHTML = '<div class="empty-note">Add guests to see the split.</div>';
+    renderTipNote(b.tipType, 0, 0, 0);
+    return;
+  }
+  const { results, tipTotal, tipShare, sharedPool, splitMode } = computeResults();
+  renderTipNote(b.tipType, tipTotal, tipShare, b.guests.length);
+
+  const grandConsumed = results.reduce((s, r) => s + r.consumption, 0);
+  const grandPaid = results.reduce((s, r) => s + r.paid, 0);
+  const grandTip = results.reduce((s, r) => s + r.tipShare, 0);
+  const grandBalance = results.reduce((s, r) => s + r.balance, 0);
+
+  const rows = results.map(r => {
+    const balCls = r.balance > 0.004 ? 'amt-pos' : (r.balance < -0.004 ? 'amt-neg' : '');
+    const balLabel = r.balance > 0.004 ? `Owes $${r.balance.toFixed(2)}`
+                    : (r.balance < -0.004 ? `Refund $${Math.abs(r.balance).toFixed(2)}` : 'Settled');
+    return `
+      <tr>
+        <td>${escapeHtml(r.name) || '(unnamed)'}</td>
+        <td>$${r.consumption.toFixed(2)}</td>
+        <td>$${r.paid.toFixed(2)}</td>
+        <td>$${r.tipShare.toFixed(2)}</td>
+        <td class="${balCls}">${balLabel}</td>
+      </tr>
+    `;
+  }).join('');
+
+  area.innerHTML = `
+    <table class="results">
+      <thead>
+        <tr>
+          <th>Guest</th>
+          <th>${splitMode === 'even' ? 'Share Owed' : 'Consumed'}</th>
+          <th>Already Paid</th>
+          <th>Tip Share</th>
+          <th>Balance</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="grand">
+      <span>Total ${splitMode === 'even' ? 'shared pool $' + sharedPool.toFixed(2) + ' · ' : ''}consumed $${grandConsumed.toFixed(2)} · Paid $${grandPaid.toFixed(2)} · Tip $${grandTip.toFixed(2)}</span>
+      <span>Net ${grandBalance >= 0 ? '$' + grandBalance.toFixed(2) + ' owed' : '$' + Math.abs(grandBalance).toFixed(2) + ' refund'}</span>
+    </div>
+  `;
+}
+
+function render() {
+  renderBillsBar();
+  renderModeUI();
+  renderGuests();
+  renderTipControls();
+  renderResults();
+  saveState();
+}
+
+/* ---------- Initial load ---------- */
+function seedDefaultBill() {
+  const b = newBill('Glowbal Dinner');
+  b.tipValue = '195.50';
+  b.guests = [
+    newGuest('Dan', [newItem('food', 65.625)]),
+    newGuest('Maple', [newItem('food', 65.625)]),
+    newGuest('Nathan', [newItem('cocktail', 73.6), newItem('food', 65.625)]),
+    newGuest('Terry', [newItem('giftcard', 135), newItem('cocktail', 47.15), newItem('wine', 34.11), newItem('food', 65.625)]),
+    newGuest('Michelle', [newItem('giftcard', 270), newItem('cocktail', 25.3), newItem('wine', 34.11), newItem('food', 65.625)]),
+    newGuest('Jonathan', [newItem('giftcard', 500), newItem('cocktail', 75.9), newItem('food', 65.625)]),
+    newGuest('TN', [newItem('cocktail', 18.41), newItem('food', 65.625)]),
+    newGuest('Kat', [newItem('food', 65.625)]),
+    newGuest('Harry', [newItem('cash', 239.15), newItem('giftcard', 135), newItem('cocktail', 50.6), newItem('wine', 34.11), newItem('food', 65.625)]),
+    newGuest('Cecil', [newItem('wine', 34.11), newItem('food', 65.625)]),
+  ];
+  bills[b.id] = b;
+  currentBillId = b.id;
+}
+
+if (!loadState()) {
+  seedDefaultBill();
+}
+render();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {
+      // Offline caching just won't be available (e.g. unsupported context) — the app still works online.
+    });
+  });
+}
+</script>
+</body>
+</html>
